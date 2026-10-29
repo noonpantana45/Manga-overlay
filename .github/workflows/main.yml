@@ -1,0 +1,54 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build APK
+        run: |
+          if [ -f "settings.gradle.kts" ]; then
+            gradle assembleRelease --no-daemon --stacktrace
+            mkdir -p out
+            cp app/build/outputs/apk/release/app-release.apk out/MangaOverlay.apk
+          elif [ -f "MangaOverlay/settings.gradle.kts" ]; then
+            cd MangaOverlay
+            gradle assembleRelease --no-daemon --stacktrace
+            mkdir -p ../out
+            cp app/build/outputs/apk/release/app-release.apk ../out/MangaOverlay.apk
+          else
+            echo "ไม่พบไฟล์โปรเจกต์ กรุณาอัปโหลดไฟล์ในโฟลเดอร์ MangaOverlay เข้าสู่หน้า Code ก่อนครับ"
+            exit 1
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MangaOverlay-apk
+          path: out/MangaOverlay.apk
+
+      - name: Attach APK to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/MangaOverlay.apk
